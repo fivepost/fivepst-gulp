@@ -8,14 +8,16 @@ const path = {
 		css: project_folder + '/css/',
 		js: project_folder + '/js/',
 		img: project_folder + '/images/',
-		fonts: project_folder + '/fonts/'
+		fonts: project_folder + '/fonts/',
+		resources: project_folder + '/resources/'
 	},
 	app: {
 		html: [source_folder + '/*.html', '!' + source_folder + '/**/_*.html'],
 		css: source_folder + '/scss/styles.scss',
 		js: source_folder + '/js/main.js',
 		img: source_folder + '/images/**/*.{jpg,png,svg,gif,ico,webp}',
-		fonts: source_folder + '/fonts/*.ttf'
+		fonts: source_folder + '/fonts/*.ttf',
+		resources: source_folder + '/resources/**'
 	},
 	watch: {
 		html: source_folder + '/**/*.html',
@@ -36,7 +38,10 @@ const { src, dest, series, parallel } = require('gulp'),
 	autoprefixer = require('gulp-autoprefixer'),
 	group_media = require('gulp-group-css-media-queries'),
 	prefix = require('gulp-rename'),
-	strip_comments = require('gulp-strip-css-comments');
+	strip_comments = require('gulp-strip-css-comments'),
+	webpackStream = require('webpack-stream'),
+	uglify = require('gulp-uglify-es').default,
+	notify = require('gulp-notify')
 
 
 
@@ -79,6 +84,41 @@ function css(params) {
 		.pipe(browsersync.stream())
 }
 
+function js() {
+	return src(path.app.js)
+		.pipe(webpackStream({
+			mode: 'development',
+			output: {
+				filename: 'main.js',
+			},
+			module: {
+				rules: [{
+					test: /\.m?js$/,
+					exclude: /(node_modules|bower_components)/,
+					use: {
+						loader: 'babel-loader',
+						options: {
+							presets: ['@babel/preset-env']
+						}
+					}
+				}]
+			},
+		}))
+		.on('error', function (err) {
+			console.error('WEBPACK ERROR', err);
+			this.emit('end'); // Don't stop the rest of the task
+		})
+		.pipe(uglify().on("error", notify.onError()))
+		.pipe(dest(path.build.js))
+		.pipe(browsersync.stream());
+
+}
+
+function resources(params) {
+	return src(path.app.resources)
+		.pipe(dest(path.build.resources))
+}
+
 function clean(params) {
 	return del(path.clean)
 }
@@ -86,7 +126,7 @@ function clean(params) {
 
 
 
-const watch = series(clean, html, css, browserSync)
+const watch = series(clean, resources, js, html, css, browserSync)
 
 exports.watch = watch
 exports.default = watch
