@@ -15,15 +15,18 @@ const path = {
 		html: [source_folder + '/*.html', '!' + source_folder + '/**/_*.html'],
 		css: source_folder + '/scss/styles.scss',
 		js: source_folder + '/js/main.js',
-		img: source_folder + '/images/**/*.{jpg,png,svg,gif,ico,webp}',
+		img: source_folder + '/images/**/*.{jpg,png,gif,ico,svg,webp}',
 		fonts: source_folder + '/fonts/*.ttf',
-		resources: source_folder + '/resources/**'
+		resources: source_folder + '/resources/**',
+		svgSprites: source_folder + '/images/makesprite/*.svg',
 	},
 	watch: {
 		html: source_folder + '/**/*.html',
 		css: source_folder + '/scss/**/*.scss',
 		js: source_folder + '/js/**/*.js',
-		img: source_folder + '/images/**/*.{jpg,png,svg,gif,ico,webp}'
+		img: source_folder + '/images/**/*.{jpg,png,gif, svg,ico,webp}',
+		svgSprites: source_folder + '/images/makesprite/*.svg',
+
 	},
 	clean: './' + project_folder + '/'
 }
@@ -41,7 +44,10 @@ const { src, dest, series, parallel } = require('gulp'),
 	strip_comments = require('gulp-strip-css-comments'),
 	webpackStream = require('webpack-stream'),
 	uglify = require('gulp-uglify-es').default,
-	notify = require('gulp-notify')
+	notify = require('gulp-notify'),
+	svgSprite = require('gulp-svg-sprite'),
+	svgMin = require('gulp-svgmin')
+
 
 
 
@@ -111,7 +117,40 @@ function js() {
 		.pipe(uglify().on("error", notify.onError()))
 		.pipe(dest(path.build.js))
 		.pipe(browsersync.stream());
+}
 
+function images(params) {
+	return src(path.app.img)
+		.pipe(webp({
+			quality: 80
+		}))
+		.pipe(dest(path.build.img))
+		.pipe(src(path.app.img))
+		.pipe(imgmin({
+			interlaced: true,
+			progressive: true,
+			optimizationLevel: 3,
+			svgoPlugins: [
+				{
+					removeViewBox: false
+				}
+			]
+		}))
+		.pipe(dest(path.build.img))
+		.pipe(browsersync.stream())
+}
+
+function svgSprites() {
+	return src(path.app.svgSprites)
+		.pipe(svgMin())
+		.pipe(svgSprite({
+			mode: {
+				stack: {
+					sprite: "../sprite.svg" //sprite file name
+				}
+			},
+		}))
+		.pipe(dest(path.build.img));
 }
 
 function resources(params) {
@@ -126,7 +165,7 @@ function clean(params) {
 
 
 
-const watch = series(clean, resources, js, html, css, browserSync)
+const watch = series(clean, resources, svgSprites, js, html, css, browserSync)
 
 exports.watch = watch
 exports.default = watch
